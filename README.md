@@ -8,7 +8,7 @@ VerseSync is a simple, powerful tool for creating bilingual or multilingual wors
 
 Whether you're leading worship in multiple languages, need transliterations for pronunciation, or want to include translations for your congregation, VerseSync makes it easy to prepare professional-looking slides quickly.
 
-**[Try VerseSync Live](https://jeff.github.io/versesync/)** — No download required, works directly in your browser!
+**[Try VerseSync Live](https://docs.ipaok.org/versesync/)** — No download required, works directly in your browser!
 
 ## Key Features
 
