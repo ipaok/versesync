@@ -1,0 +1,1430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VerseSync — Bilingual Lyrics for ProPresenter & FreeShow</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #0d1117;
+      --surface:     #161b22;
+      --surface2:    #21262d;
+      --border:      #30363d;
+      --accent:      #58a6ff;
+      --accent-bg:   rgba(88,166,255,.13);
+      --text:        #e6edf3;
+      --muted:       #7d8590;
+      --dim:         #484f58;
+      --green:       #3fb950;
+      --danger:      #f85149;
+      --warn:        #d29922;
+      --primary-col:  #79c0ff;
+      --trans-col:    #ffa657;
+      --translit-col: #c0aaff;
+      --r:            8px;
+      --r-sm:         4px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* ── HEADER ─────────────────────────────────────────────── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo { font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: -.4px; }
+    .logo span { color: var(--muted); font-weight: 400; font-size: 13px; }
+
+    /* ── STEP INDICATOR ─────────────────────────────────────── */
+    .steps { display: flex; align-items: center; gap: 4px; }
+    .step {
+      display: flex; align-items: center; gap: 7px;
+      padding: 5px 11px; border-radius: 20px;
+      font-size: 13px; font-weight: 500; color: var(--muted);
+      cursor: pointer; transition: all .15s;
+      user-select: none;
+    }
+    .step.active { background: var(--accent-bg); color: var(--accent); }
+    .step.done   { color: var(--green); }
+    .step-num {
+      width: 20px; height: 20px; border-radius: 50%;
+      background: var(--surface2); border: 1.5px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700;
+    }
+    .step.active .step-num { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+    .step.done   .step-num { background: var(--green); border-color: var(--green); color: #0d1117; }
+    .step-div { width: 20px; height: 1px; background: var(--border); }
+    @media (max-width: 600px) { .step-lbl { display: none; } }
+
+    /* ── PANELS ─────────────────────────────────────────────── */
+    .panel { display: none; max-width: 1180px; margin: 0 auto; padding: 28px 20px; }
+    .panel.active { display: block; }
+    .panel-title { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+    .panel-sub { color: var(--muted); font-size: 13px; margin-bottom: 22px; }
+
+    /* ── INPUTS ─────────────────────────────────────────────── */
+    .field {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--r-sm); color: var(--text);
+      padding: 7px 11px; font-size: 14px; transition: border-color .15s;
+    }
+    .field:focus { outline: none; border-color: var(--accent); }
+    .field::placeholder { color: var(--dim); }
+
+    .meta-row { display: flex; gap: 10px; align-items: center; margin-bottom: 20px; flex-wrap: wrap; }
+    .meta-row label { font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+    #song-title  { flex: 1; min-width: 200px; max-width: 360px; }
+    #song-artist { flex: 1; min-width: 160px; max-width: 260px; }
+
+    /* ── OPTIONS ROW ─────────────────────────────────────────── */
+    .opts-row {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 14px; flex-wrap: wrap;
+    }
+    .opts-label { font-size: 12px; font-weight: 600; color: var(--muted); margin-right: 4px; }
+    .opt-toggle {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+      cursor: pointer; border: 1.5px solid var(--border);
+      background: var(--surface2); color: var(--muted);
+      transition: all .15s; user-select: none;
+    }
+    .opt-toggle.on  { border-color: currentColor; }
+    .opt-toggle.trans.on    { color: var(--trans-col); background: rgba(255,166,87,.1); }
+    .opt-toggle.translit.on { color: var(--translit-col); background: rgba(192,170,255,.1); }
+
+    /* ── LYRICS GRID ─────────────────────────────────────────── */
+    .lyrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .lyrics-grid.three { grid-template-columns: 1fr 1fr 1fr; }
+    @media (max-width: 900px) { .lyrics-grid.three { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 680px) { .lyrics-grid, .lyrics-grid.three { grid-template-columns: 1fr; } }
+
+    .lyrics-col { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; display: flex; flex-direction: column; }
+    .lyrics-col-hdr {
+      padding: 10px 14px; border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .lang-label { font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 7px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .dot.p  { background: var(--primary-col); }
+    .dot.t  { background: var(--trans-col); }
+    .dot.tr { background: var(--translit-col); }
+    .lang-sel {
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); padding: 3px 7px; border-radius: var(--r-sm); font-size: 12px;
+    }
+    .lyrics-ta {
+      flex: 1; width: 100%; min-height: 300px;
+      background: transparent; border: none; color: var(--text);
+      padding: 14px; font-family: 'Menlo','Monaco','Consolas',monospace;
+      font-size: 13px; line-height: 1.65; resize: vertical;
+    }
+    .lyrics-ta:focus { outline: none; }
+    .lyrics-ta::placeholder { color: var(--dim); }
+    .lyrics-footer { padding: 6px 14px; border-top: 1px solid var(--border); font-size: 11px; color: var(--dim); background: var(--surface2); }
+
+    .tip {
+      background: rgba(88,166,255,.08); border: 1px solid rgba(88,166,255,.25);
+      border-radius: var(--r-sm); padding: 10px 14px; font-size: 12px;
+      color: var(--muted); margin-top: 14px; line-height: 1.6;
+    }
+    .tip strong { color: var(--accent); }
+
+    /* ── BUTTONS ─────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 15px; border-radius: var(--r-sm);
+      font-size: 14px; font-weight: 500; cursor: pointer; border: none;
+      transition: all .15s; text-decoration: none;
+    }
+    .btn-primary  { background: var(--accent); color: #0d1117; }
+    .btn-primary:hover  { background: #79b8ff; }
+    .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: var(--border); }
+    .btn-success  { background: var(--green); color: #0d1117; }
+    .btn-success:hover  { background: #56d364; }
+    .btn-sm { padding: 4px 9px; font-size: 12px; }
+    .btn-icon {
+      padding: 4px 5px; background: transparent; border: none;
+      color: var(--muted); cursor: pointer; border-radius: 3px; font-size: 13px;
+    }
+    .btn-icon:hover { background: var(--surface2); color: var(--text); }
+    .actions { margin-top: 22px; display: flex; justify-content: flex-end; gap: 8px; align-items: center; }
+    .actions-left { margin-right: auto; }
+
+    /* ── ALIGN TABLE ─────────────────────────────────────────── */
+    .align-layout { display: grid; grid-template-columns: 1fr 300px; gap: 14px; }
+    @media (max-width: 820px) { .align-layout { grid-template-columns: 1fr; } }
+
+    .align-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
+    .align-toolbar {
+      padding: 9px 12px; background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+    }
+    .toolbar-lbl { font-size: 11px; color: var(--muted); margin-right: 2px; }
+
+    .align-tbl { width: 100%; border-collapse: collapse; }
+    .align-tbl th {
+      padding: 9px 11px; background: var(--surface2);
+      border-bottom: 2px solid var(--border);
+      font-size: 11px; font-weight: 700; text-align: left; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .4px;
+    }
+    .align-tbl th.ph { color: var(--primary-col); }
+    .align-tbl th.th { color: var(--trans-col); }
+
+    .srow { border-bottom: 1px solid var(--border); cursor: pointer; transition: background .1s; }
+    .srow:hover    { background: var(--surface2); }
+    .srow.selected { background: var(--accent-bg); }
+    .srow.dragging { opacity: .4; }
+    .srow.dragover { box-shadow: inset 0 2px 0 var(--accent); }
+    .srow td { padding: 7px 11px; vertical-align: top; }
+    .srow td:first-child { width: 110px; }
+    .srow td:last-child  { width: 68px; white-space: nowrap; }
+
+    .lbl-input {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); padding: 2px 6px; border-radius: 3px;
+      font-size: 11px; width: 98px;
+    }
+    .stext { font-size: 12px; line-height: 1.55; white-space: pre-wrap; }
+    .stext.p  { color: var(--primary-col); }
+    .stext.t  { color: var(--trans-col); }
+    .stext.tr { color: var(--translit-col); }
+    .align-tbl th.trh { color: var(--translit-col); }
+    em.empty { color: var(--dim); font-style: italic; font-size: 11px; }
+
+    /* ── PREVIEW ─────────────────────────────────────────────── */
+    .preview-panel {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 14px;
+      position: sticky; top: 60px;
+    }
+    .preview-lbl { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
+    .slide-canvas {
+      width: 100%; aspect-ratio: 16/9; background: #000;
+      border-radius: 5px; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 14px; text-align: center; overflow: hidden;
+    }
+    .pv-primary  { color: #fff; font-size: 15px; font-weight: 600; line-height: 1.4; margin-top: 6px; white-space: pre-wrap; }
+    .pv-trans    { color: #ffd700; font-size: 10px; line-height: 1.4; white-space: pre-wrap; margin-bottom: 4px; }
+    .pv-translit { color: #c0aaff; font-size: 9px; line-height: 1.4; white-space: pre-wrap; margin-bottom: 2px; }
+    .pv-info     { margin-top: 10px; font-size: 11px; color: var(--muted); line-height: 1.6; }
+    .pv-hint    { color: var(--dim); font-size: 11px; margin-top: 6px; }
+
+    /* ── EXPORT CARDS ───────────────────────────────────────── */
+    .summary-bar {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 18px 22px;
+      display: flex; align-items: center; gap: 28px; margin-bottom: 22px;
+      flex-wrap: wrap;
+    }
+    .sum-title { font-size: 17px; font-weight: 700; flex: 1; min-width: 120px; }
+    .sum-item  { text-align: center; }
+    .sum-val   { font-size: 26px; font-weight: 700; color: var(--accent); }
+    .sum-lbl   { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+
+    .export-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); gap: 14px; }
+    .export-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 22px; cursor: pointer;
+      transition: all .15s;
+    }
+    .export-card:hover { border-color: var(--accent); background: var(--surface2); transform: translateY(-1px); }
+    .ec-icon  { font-size: 30px; margin-bottom: 10px; }
+    .ec-title { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+    .ec-desc  { font-size: 12px; color: var(--muted); line-height: 1.5; }
+    .ec-badge {
+      display: inline-block; padding: 2px 6px; border-radius: 3px;
+      font-size: 10px; font-weight: 700; margin-top: 8px;
+      background: var(--accent-bg); color: var(--accent);
+    }
+
+    /* ── TOAST ───────────────────────────────────────────────── */
+    .toast {
+      position: fixed; bottom: 22px; right: 22px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 11px 18px;
+      font-size: 13px; color: var(--text);
+      transform: translateY(80px); opacity: 0;
+      transition: all .25s; z-index: 9999;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.success { border-color: var(--green); }
+    .toast.error   { border-color: var(--danger); }
+    .toast.warning { border-color: var(--warn); }
+
+    /* ── PRINT ───────────────────────────────────────────────── */
+    .print-only { display: none; }
+
+    @media print {
+      body { background: #fff; color: #000; }
+      header, .actions, .preview-panel, .align-toolbar,
+      .export-grid, .summary-bar, .panel-title, .panel-sub { display: none !important; }
+      .panel { display: none !important; padding: 0; max-width: 100%; }
+      #panel-3 { display: block !important; }
+      .print-only { display: block !important; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════
+     HEADER
+     ══════════════════════════════════════════════════════════ -->
+<header>
+  <div class="logo">VerseSync <span>/ bilingual lyrics aligner</span></div>
+  <div class="steps">
+    <div class="step active" id="step-1" onclick="goToStep(1)">
+      <div class="step-num">1</div>
+      <span class="step-lbl">Lyrics</span>
+    </div>
+    <div class="step-div"></div>
+    <div class="step" id="step-2" onclick="tryStep(2)">
+      <div class="step-num">2</div>
+      <span class="step-lbl">Align</span>
+    </div>
+    <div class="step-div"></div>
+    <div class="step" id="step-3" onclick="tryStep(3)">
+      <div class="step-num">3</div>
+      <span class="step-lbl">Export</span>
+    </div>
+  </div>
+  <button class="btn btn-secondary btn-sm" onclick="startOver()" style="margin-left:16px;">Start Over</button>
+</header>
+
+<!-- ══════════════════════════════════════════════════════════
+     STEP 1 — LYRICS INPUT
+     ══════════════════════════════════════════════════════════ -->
+<div class="panel active" id="panel-1">
+  <div class="panel-title">Paste Your Lyrics</div>
+  <div class="panel-sub">Enter both languages. Separate sections with a blank line. Use labels like <code>[Verse 1]</code>, <code>[Chorus]</code>, <code>[Bridge]</code>.</div>
+
+  <div class="meta-row">
+    <label>Song Title</label>
+    <input type="text" class="field" id="song-title" placeholder="e.g. Amazing Grace">
+    <label>Artist</label>
+    <input type="text" class="field" id="song-artist" placeholder="e.g. John Newton">
+  </div>
+
+  <!-- Line options toggles -->
+  <div class="opts-row">
+    <span class="opts-label">Slide lines:</span>
+    <button class="opt-toggle translit on" id="opt-translit" onclick="toggleTranslit()">
+      <div class="dot tr"></div> Transliteration
+    </button>
+    <button class="opt-toggle trans on" id="opt-trans" onclick="toggleTrans()">
+      <div class="dot t"></div> Translation
+    </button>
+  </div>
+
+  <div class="lyrics-grid three" id="lyrics-grid">
+    <!-- Primary -->
+    <div class="lyrics-col">
+      <div class="lyrics-col-hdr">
+        <div class="lang-label"><div class="dot p"></div>Primary Language</div>
+        <select class="lang-sel" id="primary-lang"></select>
+      </div>
+      <textarea class="lyrics-ta" id="primary-lyrics"
+        placeholder="[Verse 1]&#10;Amazing grace, how sweet the sound&#10;That saved a wretch like me&#10;I once was lost but now am found&#10;Was blind but now I see&#10;&#10;[Chorus]&#10;Amazing grace&#10;How sweet the sound&#10;That saved a wretch like me"></textarea>
+      <div class="lyrics-footer" id="primary-stats">0 sections detected</div>
+    </div>
+    <!-- Transliteration -->
+    <div class="lyrics-col" id="translit-col">
+      <div class="lyrics-col-hdr">
+        <div class="lang-label"><div class="dot tr"></div>Transliteration</div>
+        <span style="font-size:11px;color:var(--muted);">Phonetic / Romanization</span>
+      </div>
+      <textarea class="lyrics-ta" id="translit-lyrics"
+        placeholder="[Verse 1]&#10;A-mey-zing greys, how sweet the sownd&#10;That sayvd a retch like mee&#10;&#10;[Chorus]&#10;A-mey-zing greys&#10;How sweet the sownd"></textarea>
+      <div class="lyrics-footer" id="translit-stats">0 sections detected</div>
+    </div>
+    <!-- Translation -->
+    <div class="lyrics-col" id="trans-col">
+      <div class="lyrics-col-hdr">
+        <div class="lang-label"><div class="dot t"></div>Translation</div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <select class="lang-sel" id="trans-lang"></select>
+          <button class="btn btn-secondary btn-sm" id="translate-btn" onclick="runAutoTranslate()" title="Auto-translate using in-browser AI (first run ~630 MB download, then cached)" style="white-space:nowrap;flex-shrink:0;">✨ Translate</button>
+        </div>
+      </div>
+      <textarea class="lyrics-ta" id="trans-lyrics"
+        placeholder="[Verso 1]&#10;Gracia admirable, cuán dulce el son&#10;Que salvó a un pecador&#10;Perdido andaba, mas él me encontró&#10;Ciego, mas hoy puedo ver&#10;&#10;[Coro]&#10;Gracia admirable&#10;Cuán dulce el son&#10;Que salvó a un pecador"></textarea>
+      <div class="lyrics-footer" id="trans-stats">0 sections detected</div>
+      <div id="translate-status" style="display:none;padding:7px 14px;font-size:11px;color:var(--accent);background:var(--surface2);border-top:1px solid var(--border);line-height:1.5;"></div>
+    </div>
+  </div>
+
+  <div class="tip">
+    <strong>Format tip:</strong> Sections separated by a blank line each become one ProPresenter/FreeShow slide.
+    Label lines (<strong>[Verse 1]</strong>, <strong>[Chorus]</strong>, etc.) set the group name — they won't appear on screen.
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-primary" onclick="goToAlign()">Parse &amp; Align →</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     STEP 2 — ALIGNMENT EDITOR
+     ══════════════════════════════════════════════════════════ -->
+<div class="panel" id="panel-2">
+  <div class="panel-title">Align Slides</div>
+  <div class="panel-sub">Each row = one slide. Drag to reorder, add blank rows to offset, split or merge as needed. Click a row to preview.</div>
+
+  <div class="align-layout">
+    <div>
+      <div class="align-wrap">
+        <div class="align-toolbar">
+          <span class="toolbar-lbl">Selected row:</span>
+          <button class="btn btn-secondary btn-sm" onclick="rowAbove()">↑ Add Above</button>
+          <button class="btn btn-secondary btn-sm" onclick="rowBelow()">↓ Add Below</button>
+          <button class="btn btn-secondary btn-sm" onclick="rowSplit()">⚡ Split</button>
+          <button class="btn btn-secondary btn-sm" onclick="rowMerge()">⊕ Merge ↓</button>
+          <button class="btn btn-secondary btn-sm" style="color:var(--danger)" onclick="rowDelete()">✕ Delete</button>
+        </div>
+        <table class="align-tbl">
+          <thead>
+            <tr>
+              <th>Section</th>
+              <th class="ph" id="col-primary-hdr">Primary</th>
+              <th class="trh" id="col-translit-hdr" style="display:none">Transliteration</th>
+              <th class="th" id="col-trans-hdr">Translation</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="align-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Preview -->
+    <div class="preview-panel">
+      <div class="preview-lbl">Slide Preview</div>
+      <div class="slide-canvas">
+        <div class="pv-trans"    id="pv-trans"></div>
+        <div class="pv-translit" id="pv-translit"></div>
+        <div class="pv-primary"  id="pv-primary">Click a row to preview</div>
+      </div>
+      <div class="pv-info" id="pv-info"></div>
+      <div class="pv-hint">Styling is set inside ProPresenter / FreeShow. Preview shows layout only.</div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-secondary actions-left" onclick="goToStep(1)">← Back</button>
+    <button class="btn btn-primary" onclick="goToExport()">Export Options →</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     STEP 3 — EXPORT
+     ══════════════════════════════════════════════════════════ -->
+<div class="panel" id="panel-3">
+  <div class="panel-title">Export</div>
+  <div class="panel-sub">Download your bilingual presentation in your preferred format.</div>
+
+  <div class="summary-bar">
+    <div class="sum-title" id="ex-title">—</div>
+    <div class="sum-item"><div class="sum-val" id="ex-slides">0</div><div class="sum-lbl">Slides</div></div>
+    <div class="sum-item"><div class="sum-val" id="ex-sections">0</div><div class="sum-lbl">Sections</div></div>
+    <div class="sum-item"><div class="sum-val" id="ex-langs">2</div><div class="sum-lbl">Languages</div></div>
+  </div>
+
+  <div class="export-grid">
+    <div class="export-card" onclick="exportProPresenter()">
+      <div class="ec-icon">📽</div>
+      <div class="ec-title">ProPresenter</div>
+      <div class="ec-desc">Native ProPresenter 7+ binary file. All languages stacked on each slide with colored text — ready to open directly in ProPresenter.</div>
+      <div class="ec-badge">.pro</div>
+    </div>
+    <div class="export-card" onclick="exportFreeShow()">
+      <div class="ec-icon">🎬</div>
+      <div class="ec-title">FreeShow</div>
+      <div class="ec-desc">Export as a FreeShow .show file. Primary language text is at the top of each slide, translation below in a styled text item.</div>
+      <div class="ec-badge">.show</div>
+    </div>
+    <div class="export-card" onclick="exportOpenLyrics()">
+      <div class="ec-icon">🎵</div>
+      <div class="ec-title">OpenLyrics XML</div>
+      <div class="ec-desc">Universal worship format supported by EasyWorship, MediaShout, OpenLP, and many others. Each language is a separate verse.</div>
+      <div class="ec-badge">.xml</div>
+    </div>
+    <div class="export-card" onclick="exportText()">
+      <div class="ec-icon">📄</div>
+      <div class="ec-title">Plain Text</div>
+      <div class="ec-desc">Interleaved bilingual text file — useful as a reference sheet or to copy into any presentation software manually.</div>
+      <div class="ec-badge">.txt</div>
+    </div>
+    <div class="export-card" onclick="doPrint()">
+      <div class="ec-icon">🖨</div>
+      <div class="ec-title">Print / PDF</div>
+      <div class="ec-desc">Print a formatted bilingual lyrics sheet, or save to PDF via your browser's print dialog (select "Save as PDF").</div>
+      <div class="ec-badge">PDF</div>
+    </div>
+  </div>
+
+  <!-- Print output (hidden on screen, shown when printing) -->
+  <div class="print-only" id="print-body"></div>
+
+  <div class="actions">
+    <button class="btn btn-secondary actions-left" onclick="goToStep(2)">← Back to Align</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- ══════════════════════════════════════════════════════════
+     AUTO-TRANSLATE  (transformers.js · NLLB-200-distilled-600M)
+     ══════════════════════════════════════════════════════════ -->
+<script type="module">
+import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3/dist/transformers.min.js';
+
+// NLLB-200 BCP-47 → Flores-200 code map (covers every language in the dropdown)
+const NLLB = {
+  'en':    'eng_Latn',
+  'es':    'spa_Latn',
+  'zh':    'zho_Hans',
+  'zh-TW': 'zho_Hant',
+  'ko':    'kor_Hang',
+  'pt':    'por_Latn',
+  'pt-BR': 'por_Latn',
+  'fr':    'fra_Latn',
+  'de':    'deu_Latn',
+  'tl':    'tgl_Latn',
+  'vi':    'vie_Latn',
+  'hi':    'hin_Deva',
+  'ml':    'mal_Mlym',
+  'te':    'tel_Telu',
+  'ta':    'tam_Taml',
+  'ar':    'arb_Arab',
+  'ru':    'rus_Cyrl',
+  'ja':    'jpn_Jpan',
+  'id':    'ind_Latn',
+  'sw':    'swh_Latn',
+  'it':    'ita_Latn',
+};
+
+const LABEL_RE = /^\[.+\]$|^\(.+\)$|^##?\s*.+$|^(?:verse\s*\d*|v\d+|chorus|ch|bridge|pre[-\s]?chorus|intro|outro|tag|vamp|refrain|interlude|hook|ending)[\s:]*$/i;
+
+let translator = null;
+
+window.runAutoTranslate = async function () {
+  const primaryText = document.getElementById('primary-lyrics').value.trim();
+  if (!primaryText) return toast('Enter primary lyrics first', 'warning');
+
+  const srcCode = document.getElementById('primary-lang').value;
+  const tgtCode = document.getElementById('trans-lang').value;
+  const src = NLLB[srcCode];
+  const tgt = NLLB[tgtCode];
+
+  if (!src) return toast(`Auto-translate doesn't support "${srcCode}" yet`, 'warning');
+  if (!tgt) return toast(`Auto-translate doesn't support "${tgtCode}" yet — select a specific language`, 'warning');
+  if (src === tgt) return toast('Source and target language are the same', 'warning');
+
+  const btn      = document.getElementById('translate-btn');
+  const statusEl = document.getElementById('translate-status');
+
+  btn.disabled        = true;
+  btn.textContent     = '⏳ Working…';
+  statusEl.style.display = 'block';
+  statusEl.textContent   = 'First run: downloading model (~630 MB, cached for future visits)…';
+
+  try {
+    if (!translator) {
+      translator = await pipeline(
+        'translation',
+        'Xenova/nllb-200-distilled-600M',
+        {
+          progress_callback: ({ status, loaded, total, file }) => {
+            if (status === 'downloading') {
+              const pct  = total ? Math.round((loaded / total) * 100) : '?';
+              const name = file ? file.split('/').pop() : '';
+              statusEl.textContent = `Downloading${name ? ' ' + name : ''}… ${pct}%`;
+            } else if (status === 'loading') {
+              statusEl.textContent = 'Loading model into memory…';
+            } else if (status === 'ready') {
+              statusEl.textContent = 'Model ready — starting translation…';
+            }
+          },
+        }
+      );
+    }
+
+    // Split on blank lines, translate section by section
+    const blocks = primaryText.split(/\n[ \t]*\n/).filter(b => b.trim());
+    const output = [];
+
+    for (let i = 0; i < blocks.length; i++) {
+      statusEl.textContent = `Translating section ${i + 1} of ${blocks.length}…`;
+
+      const lines     = blocks[i].split('\n').map(l => l.trimEnd());
+      const hasLabel  = LABEL_RE.test(lines[0] || '');
+      const labelLine = hasLabel ? lines[0] : null;
+      const bodyLines = hasLabel ? lines.slice(1) : lines;
+
+      const transLines = [];
+      for (const line of bodyLines) {
+        if (!line.trim()) { transLines.push(''); continue; }
+        const res = await translator(line, { src_lang: src, tgt_lang: tgt });
+        transLines.push(res[0]?.translation_text ?? line);
+      }
+
+      output.push(labelLine
+        ? [labelLine, ...transLines].join('\n')
+        : transLines.join('\n')
+      );
+    }
+
+    document.getElementById('trans-lyrics').value = output.join('\n\n');
+    refreshStats();
+    statusEl.innerHTML = '&#10003; Draft complete — <strong>please review before use.</strong> AI translation may miss poetic or liturgical nuance.';
+    toast('Auto-translation done — review before using!', 'success');
+
+  } catch (err) {
+    console.error('Translation error:', err);
+    toast('Translation failed: ' + (err.message || err), 'error');
+    statusEl.textContent = 'Error: ' + (err.message || 'Unknown error');
+    translator = null; // reset so next attempt retries
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = '✨ Auto-translate';
+  }
+};
+</script>
+
+<!-- ══════════════════════════════════════════════════════════
+     JAVASCRIPT
+     ══════════════════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+// ─── Constants ───────────────────────────────────────────────
+const LANGS = [
+  ['en',    'English'],
+  ['es',    'Spanish'],
+  ['zh',    'Chinese (Simplified)'],
+  ['zh-TW', 'Chinese (Traditional)'],
+  ['ko',    'Korean'],
+  ['pt',    'Portuguese'],
+  ['pt-BR', 'Portuguese (Brazil)'],
+  ['fr',    'French'],
+  ['de',    'German'],
+  ['tl',    'Tagalog'],
+  ['vi',    'Vietnamese'],
+  ['hi',    'Hindi'],
+  ['ml',    'Malayalam'],
+  ['te',    'Telugu'],
+  ['ta',    'Tamil'],
+  ['ar',    'Arabic'],
+  ['ru',    'Russian'],
+  ['ja',    'Japanese'],
+  ['id',    'Indonesian'],
+  ['sw',    'Swahili'],
+  ['it',    'Italian'],
+  ['other', 'Other'],
+];
+
+const SECTION_RE = [
+  /^\[(.+)\]$/,
+  /^\((.+)\)$/,
+  /^##?\s*(.+)$/,
+  /^(verse\s*\d*|v\d+|chorus|ch|bridge|pre[-\s]?chorus|intro|outro|tag|vamp|refrain|interlude|hook|ending)[\s:]*$/i,
+];
+
+const GROUP_COLORS = [
+  '#4e9df5','#e06c3a','#3fb950','#a371f7','#d29922',
+  '#1f8072','#e05c97','#5c9de0','#70d679',
+];
+
+// ─── State ───────────────────────────────────────────────────
+const S = {
+  slides:      [],   // [{id,label,pLines,tLines,trLines}]
+  sel:         -1,
+  drag:        -1,
+  hasTrans:    true,
+  hasTranslit: true,
+};
+
+// ─── Init ────────────────────────────────────────────────────
+(function init() {
+  ['primary-lang','trans-lang'].forEach((id,i) => {
+    const sel = document.getElementById(id);
+    LANGS.forEach(([code,name]) => {
+      const o = document.createElement('option');
+      o.value = code; o.textContent = name;
+      if (i===0 && code==='en') o.selected = true;
+      if (i===1 && code==='es') o.selected = true;
+      sel.appendChild(o);
+    });
+  });
+  document.getElementById('primary-lyrics').addEventListener('input', refreshStats);
+  document.getElementById('trans-lyrics').addEventListener('input', refreshStats);
+  document.getElementById('translit-lyrics').addEventListener('input', refreshStats);
+})();
+
+// ─── Parsing ─────────────────────────────────────────────────
+function parseLyrics(text) {
+  if (!text.trim()) return [];
+  return text.split(/\n[ \t]*\n/).filter(b=>b.trim()).map((block,i) => {
+    const lines = block.split('\n').map(l=>l.trimEnd()).filter(l=>l.trim());
+    let label = null, body = lines;
+    for (const re of SECTION_RE) {
+      const m = lines[0]?.match(re);
+      if (m) { label = (m[1]||lines[0]).trim(); body = lines.slice(1); break; }
+    }
+    return { label: label || `Section ${i+1}`, lines: body };
+  });
+}
+
+function refreshStats() {
+  const ps  = parseLyrics(document.getElementById('primary-lyrics').value);
+  const ts  = parseLyrics(document.getElementById('trans-lyrics').value);
+  const trs = parseLyrics(document.getElementById('translit-lyrics').value);
+  document.getElementById('primary-stats').textContent  = `${ps.length} section${ps.length!==1?'s':''} detected`;
+  document.getElementById('trans-stats').textContent    = `${ts.length} section${ts.length!==1?'s':''} detected`;
+  document.getElementById('translit-stats').textContent = `${trs.length} section${trs.length!==1?'s':''} detected`;
+}
+
+// ─── Toggle line options ──────────────────────────────────────
+function toggleTrans() {
+  S.hasTrans = !S.hasTrans;
+  const btn = document.getElementById('opt-trans');
+  const col = document.getElementById('trans-col');
+  btn.classList.toggle('on', S.hasTrans);
+  col.style.display = S.hasTrans ? '' : 'none';
+  updateGridCols();
+}
+
+function toggleTranslit() {
+  S.hasTranslit = !S.hasTranslit;
+  const btn = document.getElementById('opt-translit');
+  const col = document.getElementById('translit-col');
+  btn.classList.toggle('on', S.hasTranslit);
+  col.style.display = S.hasTranslit ? '' : 'none';
+  updateGridCols();
+}
+
+function updateGridCols() {
+  const grid = document.getElementById('lyrics-grid');
+  const count = 1 + (S.hasTrans?1:0) + (S.hasTranslit?1:0);
+  grid.classList.toggle('three', count === 3);
+}
+
+// ─── Navigation ──────────────────────────────────────────────
+function goToStep(n) {
+  for (let i=1;i<=3;i++) {
+    document.getElementById(`step-${i}`).className  = 'step' + (i===n?' active':i<n?' done':'');
+    document.getElementById(`panel-${i}`).className = 'panel' + (i===n?' active':'');
+  }
+  window.scrollTo(0,0);
+}
+
+function tryStep(n) {
+  if (n>=2 && S.slides.length===0) return toast('Parse your lyrics first','warning');
+  goToStep(n);
+}
+
+function goToAlign() {
+  const pText  = document.getElementById('primary-lyrics').value;
+  const tText  = document.getElementById('trans-lyrics').value;
+  const trText = document.getElementById('translit-lyrics').value;
+  if (!pText.trim()) return toast('Enter your primary lyrics first','error');
+
+  const ps  = parseLyrics(pText);
+  const ts  = S.hasTrans    ? parseLyrics(tText)  : [];
+  const trs = S.hasTranslit ? parseLyrics(trText) : [];
+  const len = Math.max(ps.length, ts.length, trs.length);
+
+  S.slides = Array.from({length:len},(_,i)=>({
+    id:      uid(),
+    label:   (ps[i]||ts[i]||trs[i])?.label || `Section ${i+1}`,
+    pLines:  ps[i]?.lines  || [],
+    tLines:  ts[i]?.lines  || [],
+    trLines: trs[i]?.lines || [],
+  }));
+  S.sel = S.slides.length>0 ? 0 : -1;
+
+  updateColHeaders();
+  renderTable();
+  goToStep(2);
+}
+
+function goToExport() {
+  const title   = v('song-title') || 'Untitled Song';
+  const slides  = S.slides.length;
+  const sections= new Set(S.slides.map(s=>s.label)).size;
+  document.getElementById('ex-title').textContent    = title;
+  document.getElementById('ex-slides').textContent   = slides;
+  document.getElementById('ex-sections').textContent = sections;
+  goToStep(3);
+}
+
+function startOver() {
+  if (confirm('Clear all lyrics and start over?')) {
+    ['primary-lyrics','trans-lyrics','song-title','song-artist'].forEach(id=>{ document.getElementById(id).value=''; });
+    S.slides=[]; S.sel=-1;
+    refreshStats();
+    goToStep(1);
+  }
+}
+
+function updateColHeaders() {
+  const pName = langName('primary-lang');
+  const tName = langName('trans-lang');
+  document.getElementById('col-primary-hdr').textContent  = pName;
+  document.getElementById('col-trans-hdr').textContent    = tName;
+  document.getElementById('col-trans-hdr').style.display  = S.hasTrans    ? '' : 'none';
+  document.getElementById('col-translit-hdr').style.display = S.hasTranslit ? '' : 'none';
+}
+
+// ─── Alignment Table ─────────────────────────────────────────
+function renderTable() {
+  const tbody = document.getElementById('align-tbody');
+  tbody.innerHTML = '';
+
+  if (!S.slides.length) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:40px;color:var(--dim);">No slides yet — go back and enter your lyrics.</td></tr>`;
+    return;
+  }
+
+  S.slides.forEach((slide, idx) => {
+    const tr = document.createElement('tr');
+    tr.className = 'srow' + (idx===S.sel?' selected':'');
+    tr.dataset.idx = idx;
+    tr.draggable = true;
+
+    const pHtml  = slide.pLines.length
+      ? `<span class="stext p">${hesc(slide.pLines.join('\n'))}</span>`
+      : `<em class="empty">— empty —</em>`;
+    const tHtml  = slide.tLines.length
+      ? `<span class="stext t">${hesc(slide.tLines.join('\n'))}</span>`
+      : `<em class="empty">— empty —</em>`;
+    const trHtml = slide.trLines.length
+      ? `<span class="stext tr">${hesc(slide.trLines.join('\n'))}</span>`
+      : `<em class="empty">— empty —</em>`;
+
+    const trCell = S.hasTranslit
+      ? `<td style="">${trHtml}</td>`
+      : '';
+    const tCell  = S.hasTrans
+      ? `<td>${tHtml}</td>`
+      : '';
+
+    tr.innerHTML = `
+      <td><input class="lbl-input" value="${hesc(slide.label)}"
+            onchange="S.slides[${idx}].label=this.value"
+            onclick="event.stopPropagation()"></td>
+      <td>${pHtml}</td>
+      ${trCell}
+      ${tCell}
+      <td>
+        <button class="btn-icon" title="Move up"   onclick="event.stopPropagation();moveRow(${idx},-1)">↑</button>
+        <button class="btn-icon" title="Move down" onclick="event.stopPropagation();moveRow(${idx},1)">↓</button>
+      </td>`;
+
+    tr.addEventListener('click', ()=>selectRow(idx));
+
+    tr.addEventListener('dragstart', e=>{ S.drag=idx; tr.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; });
+    tr.addEventListener('dragend',   ()=>{ tr.classList.remove('dragging'); clearDragOver(); });
+    tr.addEventListener('dragover',  e=>{ e.preventDefault(); clearDragOver(); tr.classList.add('dragover'); });
+    tr.addEventListener('dragleave', ()=>tr.classList.remove('dragover'));
+    tr.addEventListener('drop',      e=>{ e.preventDefault(); dropRow(idx); });
+
+    tbody.appendChild(tr);
+  });
+
+  updatePreview();
+}
+
+function clearDragOver() {
+  document.querySelectorAll('.dragover').forEach(el=>el.classList.remove('dragover'));
+}
+
+function selectRow(idx) {
+  S.sel = idx;
+  document.querySelectorAll('.srow').forEach((tr,i)=>tr.classList.toggle('selected',i===idx));
+  updatePreview();
+}
+
+function updatePreview() {
+  const slide = S.slides[S.sel];
+  if (!slide) {
+    document.getElementById('pv-primary').textContent = 'Click a row to preview';
+    document.getElementById('pv-trans').textContent   = '';
+    document.getElementById('pv-info').textContent    = '';
+    return;
+  }
+  document.getElementById('pv-primary').textContent  = slide.pLines.join('\n') || '(empty)';
+  document.getElementById('pv-trans').textContent    = (S.hasTrans    && slide.tLines.join('\n'))  || '';
+  document.getElementById('pv-translit').textContent = (S.hasTranslit && slide.trLines.join('\n')) || '';
+  const infoLines = [
+    `Section: ${slide.label}`,
+    `Primary: ${slide.pLines.length} line${slide.pLines.length!==1?'s':''}`,
+  ];
+  if (S.hasTrans)    infoLines.push(`Translation: ${slide.tLines.length} line${slide.tLines.length!==1?'s':''}`);
+  if (S.hasTranslit) infoLines.push(`Translit: ${slide.trLines.length} line${slide.trLines.length!==1?'s':''}`);
+  document.getElementById('pv-info').textContent = infoLines.join('\n');
+}
+
+// Row operations
+function rowAbove()  { insertAt(S.sel>=0?S.sel:0); }
+function rowBelow()  { insertAt(S.sel>=0?S.sel+1:S.slides.length); }
+function rowDelete() {
+  if (S.sel<0||!S.slides.length) return;
+  S.slides.splice(S.sel,1);
+  S.sel = Math.min(S.sel, S.slides.length-1);
+  renderTable(); toast('Row deleted');
+}
+function rowSplit() {
+  if (S.sel<0) return;
+  const s = S.slides[S.sel];
+  if (s.pLines.length+s.tLines.length+s.trLines.length <= 2) return toast('Not enough lines to split','warning');
+  const ph=Math.ceil(s.pLines.length/2), th=Math.ceil(s.tLines.length/2), trh=Math.ceil(s.trLines.length/2);
+  const next = {id:uid(),label:s.label+' (2)',pLines:s.pLines.splice(ph),tLines:s.tLines.splice(th),trLines:s.trLines.splice(trh)};
+  S.slides.splice(S.sel+1,0,next);
+  renderTable(); toast('Row split');
+}
+function rowMerge() {
+  if (S.sel<0||S.sel>=S.slides.length-1) return toast('No next row','warning');
+  const a=S.slides[S.sel], b=S.slides[S.sel+1];
+  a.pLines =[...a.pLines, '',...b.pLines];
+  a.tLines =[...a.tLines, '',...b.tLines];
+  a.trLines=[...a.trLines,'',...b.trLines];
+  S.slides.splice(S.sel+1,1);
+  renderTable(); toast('Rows merged');
+}
+function insertAt(idx) {
+  S.slides.splice(idx,0,{id:uid(),label:'New Section',pLines:[],tLines:[],trLines:[]});
+  S.sel=idx; renderTable();
+}
+function moveRow(idx,dir) {
+  const ni=idx+dir;
+  if (ni<0||ni>=S.slides.length) return;
+  [S.slides[idx],S.slides[ni]]=[S.slides[ni],S.slides[idx]];
+  S.sel=ni; renderTable();
+}
+function dropRow(targetIdx) {
+  if (S.drag<0||S.drag===targetIdx) return;
+  const moved=S.slides.splice(S.drag,1)[0];
+  S.slides.splice(targetIdx,0,moved);
+  S.sel=targetIdx; S.drag=-1;
+  renderTable();
+}
+
+// ─── Export: ProPresenter 7+ (native binary, ported from VerseFlow) ──────────
+
+// ── RTF escape (same logic used in VerseFlow's rtf_escape) ──────────────────
+function escRTF(text) {
+  let r = '';
+  for (const ch of String(text || '')) {
+    const c = ch.charCodeAt(0);
+    if      (ch === '\\') r += '\\\\';
+    else if (ch === '{' ) r += '\\{';
+    else if (ch === '}' ) r += '\\}';
+    else if (ch === '\n') r += '\\line ';
+    else if (ch === '\r') r += '';
+    else if (c > 127)     { const s = c > 32767 ? c - 65536 : c; r += `\\u${s} `; }
+    else                   r += ch;
+  }
+  return r;
+}
+
+// ── Protobuf wire helpers ────────────────────────────────────────────────────
+function ppConcat(...arrs) {
+  let n = 0; for (const a of arrs) n += a.length;
+  const out = new Uint8Array(n); let i = 0;
+  for (const a of arrs) { out.set(a, i); i += a.length; }
+  return out;
+}
+function ppVI(n) {             // varint
+  n = n >>> 0;
+  const b = [];
+  while (n > 0x7f) { b.push((n & 0x7f) | 0x80); n >>>= 7; }
+  b.push(n); return new Uint8Array(b);
+}
+function ppLd(fn, d)  { return ppConcat(ppVI((fn<<3)|2), ppVI(d.length), d); }
+function ppVF(fn, n)  { return ppConcat(ppVI(fn<<3),     ppVI(n));            }
+function ppStr(fn, s) { return ppLd(fn, new TextEncoder().encode(s));          }
+function ppDbl(fn, v) {
+  const b = new ArrayBuffer(8); new DataView(b).setFloat64(0, v, true);
+  return ppConcat(ppVI((fn<<3)|1), new Uint8Array(b));
+}
+function ppFlt(fn, v) {
+  const b = new ArrayBuffer(4); new DataView(b).setFloat32(0, v, true);
+  return ppConcat(ppVI((fn<<3)|5), new Uint8Array(b));
+}
+function ppUID(fn, u) { return ppLd(fn, ppStr(1, u)); }
+function ppRect(fn, ox, oy, w, h) {
+  return ppLd(fn, ppConcat(
+    ppLd(1, ppConcat(ppDbl(1, ox), ppDbl(2, oy))),
+    ppLd(2, ppConcat(ppDbl(1, w),  ppDbl(2, h)))
+  ));
+}
+function ppHex(s) { return new Uint8Array(s.match(/../g).map(b => parseInt(b, 16))); }
+
+// ── Pre-baked appearance blobs (from VerseFlow/config.py) ───────────────────
+const _ppEF8  = ppHex('429201080112060a0012001a0012210a0909000000000000f03f120909000000000000f03f1a0909000000000000f03f123c0a1209000000000000f03f11000000000000f03f121209000000000000f03f11000000000000f03f1a1209000000000000f03f11000000000000f03f12210a0911000000000000f03f120911000000000000f03f1a0911000000000000f03f1a020801');
+const _ppEF9  = ppHex('4a160a140df1f0f03d159190103f1d0000803f250000803f');
+const _ppEF10 = ppHex('521f1100000000000008401a140d0000803f150000803f1d0000803f250000803f');
+const _ppEF11 = ppHex('5a2b110000000000b073401900000000000014402100000000000014402a05250000803f31000000000000e83f');
+const _ppEF12 = ppHex('6209119a9999999999a93f');
+const _ppEF14 = ppHex('7200');
+// Element 1 — primary language appearance (extracted from working PP library files)
+const _ppE1F13Pre  = ppHex('1a9a010a1f0a0948656c7665746963611100000000008051404a0948656c76657469636110011a140d0000803f150000803f1d0000803f250000803f22003249080229000000000000f03f5a005a005a005a005a005a005a005a005a090900000000000026405a090900000000000026405a090900000000000026405a090900000000000042406a004a006a060a02101f10016a080a040820103c1001222b110000000000b073401900000000000014402100000000000014402a05250000803f31000000000000e83f');
+const _ppE1F13Post = ppHex('3001420048015a072020e280a2202062071a05250000803f');
+const _ppE1OF9     = ppHex('4a1411000000000000e03f1801216f4bcf4d9378ab3f');
+// Element 2 — secondary language appearance (extracted from working PP library files)
+const _ppE2F13Pre  = ppHex('1a9a010a1f0a0948656c7665746963611100000000008051404a0948656c76657469636110011a140d0000803f150000803f1d0000803f250000803f22003249080229000000000000f03f5a005a005a005a005a005a005a005a005a090900000000000026405a090900000000000026405a090900000000000026405a090900000000000042406a004a006a060a02101210016a080a040813102c1001222b110000000000b073401900000000000014402100000000000014402a05250000803f31000000000000e83f');
+const _ppE2F13Post = ppHex('3001420048015a072020e280a2202062071a05250000803f');
+const _ppE2OF9     = ppHex('4a1411000000000000e03f1801212bb5522bb552ab3f');
+// Document-level fields
+const _ppDocF8 = ppHex('42070a05250000803f');
+const _ppDocF9 = ppHex('4a021801');
+// Group colors: 0=Chorus (light blue), 1=Verse (dark blue), 2=Title (grey)
+const _ppGroupColors = [[0.4667,0.8,1],[0.1765,0.302,1],[0.6,0.6,0.6]];
+
+// ── RTF bytes for one text element (UTF-8, custom text color) ───────────────
+function ppRTF(lines, r, g, b, fs) {
+  const cr = Math.round(r/255*100000), cg = Math.round(g/255*100000), cb = Math.round(b/255*100000);
+  const body = (lines||[]).map(l => escRTF(l)).join('\\line ');
+  return new TextEncoder().encode(
+    '{\\rtf1\\ansi\\ansicpg1252\\cocoartf2868\n' +
+    '\\cocoatextscaling0\\cocoaplatform0' +
+    '{\\fonttbl\\f0\\fswiss\\fcharset0 Helvetica;}\n' +
+    `{\\colortbl;\\red255\\green255\\blue255;\\red${r}\\green${g}\\blue${b};}\n` +
+    `{\\*\\expandedcolortbl;;\\cssrgb\\c${cr}\\c${cg}\\c${cb};}\n` +
+    '\\pard\\tx0\\tx0\\tx0\\tx0\\tx0\\tx0\\tx0\\tx0' +
+    '\\tx220\\tx220\\tx220\\tx720\\pardirnatural\\qc\\partightenfactor0\n\n' +
+    `\\f0\\fs${fs} \\cf2 \\uc0 ${body}}`
+  );
+}
+
+// ── Build one text element binary ────────────────────────────────────────────
+// posRect = ppRect(3,...), f13Pre/Post = appearance blobs,
+// outerF9 = outer field-9 blob, typeVal = 2 (primary) or 3 (secondary)
+function ppTextElem(rtfBytes, posRect, f13Pre, f13Post, outerF9, typeVal) {
+  const inner = ppConcat(
+    ppUID(1, uuid4().toUpperCase()),
+    posRect,
+    ppDbl(5, 1.0),
+    _ppEF8, _ppEF9, _ppEF10, _ppEF11, _ppEF12,
+    ppLd(13, ppConcat(f13Pre, ppLd(5, rtfBytes), f13Post)),
+    _ppEF14
+  );
+  return ppLd(1, ppConcat(ppLd(1, inner), ppVF(4, typeVal), outerF9));
+}
+
+// ── Slide box positions (screen px, top-left origin) ─────────────────────────
+// Matches VerseFlow's VerseBridge Bilingual theme geometry
+const _ppML = 26.67, _ppMT = 13.92, _ppIW = 1866.66;
+function ppBoxes(showTR, showT) {
+  // Returns [{ox,oy,w,h},...] for [primary, translit?, translation?]
+  if (!showTR && !showT)
+    return [{ ox:_ppML, oy:_ppMT,  w:_ppIW, h:1052.16 }];
+  if (showTR && showT)
+    return [
+      { ox:_ppML, oy:648,   w:_ppIW, h:418.08 },  // primary (bottom)
+      { ox:_ppML, oy:353,   w:_ppIW, h:270    },  // translit (middle)
+      { ox:_ppML, oy:_ppMT, w:_ppIW, h:315    },  // translation (top)
+    ];
+  // One secondary only
+  return [
+    { ox:_ppML, oy:555.05, w:1863.78, h:487.12 },  // primary (bottom, VerseFlow layout)
+    { ox:_ppML, oy:_ppMT,  w:1873.87, h:500.09 },  // secondary (top)
+  ];
+}
+
+// ── Build element bytes for a slide ──────────────────────────────────────────
+function ppSlideElems(pLines, trLines, tLines) {
+  const showTR = S.hasTranslit && (trLines||[]).length > 0;
+  const showT  = S.hasTrans   && (tLines ||[]).length > 0;
+  const boxes  = ppBoxes(showTR, showT);
+
+  let elems = ppTextElem(
+    ppRTF(pLines||[], 255, 255, 255, 200),
+    ppRect(3, boxes[0].ox, boxes[0].oy, boxes[0].w, boxes[0].h),
+    _ppE1F13Pre, _ppE1F13Post, _ppE1OF9, 2
+  );
+  if (showTR) elems = ppConcat(elems, ppTextElem(
+    ppRTF(trLines, 192, 170, 255, 160),
+    ppRect(3, boxes[1].ox, boxes[1].oy, boxes[1].w, boxes[1].h),
+    _ppE2F13Pre, _ppE2F13Post, _ppE2OF9, 3
+  ));
+  if (showT) {
+    const tb = boxes[showTR ? 2 : 1];
+    elems = ppConcat(elems, ppTextElem(
+      ppRTF(tLines, 255, 215, 0, 160),
+      ppRect(3, tb.ox, tb.oy, tb.w, tb.h),
+      _ppE2F13Pre, _ppE2F13Post, _ppE2OF9, 3
+    ));
+  }
+  return elems;
+}
+
+// ── Build one slide binary ────────────────────────────────────────────────────
+function ppSlide(slideUID, slideName, elemsBytes) {
+  const canvas  = ppLd(6, ppConcat(ppDbl(1, 1920), ppDbl(2, 1080)));
+  const frame   = ppConcat(elemsBytes, ppLd(5, ppFlt(4, 1.0)), canvas, ppUID(7, uuid4().toUpperCase()));
+  const f23     = ppLd(23, ppLd(2, ppConcat(ppLd(1, frame), ppLd(4, ppVF(3, 1)))));
+  const content = ppConcat(ppUID(1, uuid4().toUpperCase()), ppVF(6, 1), ppVF(9, 11), f23);
+  const data    = ppConcat(
+    ppUID(1, slideUID), ppStr(2, slideName), ppVF(5, 1),
+    ppStr(8, ''), ppLd(10, content), ppVF(12, 1)
+  );
+  return ppLd(13, data);
+}
+
+// ── Build one group binary ────────────────────────────────────────────────────
+function ppGroup(groupUID, name, colorIdx, slideUIDs) {
+  const [r, g, a] = _ppGroupColors[colorIdx % _ppGroupColors.length];
+  const def  = ppConcat(
+    ppUID(1, groupUID), ppStr(2, name),
+    ppLd(3, ppConcat(ppFlt(2, r), ppFlt(3, g), ppFlt(4, a))),
+    ppStr(4, ''), ppUID(5, uuid4().toUpperCase())
+  );
+  const refs = slideUIDs.reduce((acc, uid) => ppConcat(acc, ppUID(2, uid)), new Uint8Array());
+  return ppLd(12, ppConcat(ppLd(1, def), refs));
+}
+
+// ── Main export ───────────────────────────────────────────────────────────────
+function exportProPresenter() {
+  const title = v('song-title') || 'Untitled Song';
+
+  // Title slide (blank)
+  const titleUID = uuid4().toUpperCase();
+  let groupsB = ppGroup(uuid4().toUpperCase(), 'Title Slide', 2, [titleUID]);
+  let slidesB = ppSlide(titleUID, 'Title Slide', ppSlideElems([], [], []));
+
+  // Content slides — one group per slide
+  S.slides.forEach((s) => {
+    const uid    = uuid4().toUpperCase();
+    const label  = s.label || 'Slide';
+    const gl     = label.toLowerCase();
+    const color  = /chorus|coro|refrain/.test(gl) ? 0 : 1;
+    slidesB = ppConcat(slidesB, ppSlide(uid, label, ppSlideElems(s.pLines, s.trLines, s.tLines)));
+    groupsB = ppConcat(groupsB, ppGroup(uuid4().toUpperCase(), label, color, [uid]));
+  });
+
+  const header = ppLd(1, ppConcat(
+    ppVF(1, 1),
+    ppLd(2, ppConcat(ppVF(1, 14), ppVF(2, 4), ppVF(3, 1))),
+    ppVF(3, 1),
+    ppLd(4, ppConcat(ppVF(1, 18), ppStr(4, '301989919')))
+  ));
+
+  const doc = ppConcat(
+    header,
+    ppUID(2, uuid4().toUpperCase()),
+    ppStr(3, title),
+    _ppDocF8, _ppDocF9,
+    groupsB,
+    slidesB,
+    ppStr(14, ''),
+    ppLd(17, ppDbl(5, 300.0))
+  );
+
+  // Binary download
+  const blob = new Blob([doc], { type: 'application/octet-stream' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = safeName(title) + '.pro';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+  toast('ProPresenter file downloaded!', 'success');
+}
+
+// ─── Export: FreeShow ─────────────────────────────────────────
+function exportFreeShow() {
+  const title  = v('song-title') || 'Untitled Song';
+  const artist = v('song-artist') || '';
+  const pLang  = langName('primary-lang');
+  const tLang  = langName('trans-lang');
+  const now    = Date.now();
+
+  // Build slides object and layout array
+  const slidesObj = {};
+  const layoutSlides = [];
+
+  // Group map for globalGroup naming
+  const groupCount = {};
+
+  S.slides.forEach((s) => {
+    const sId = s.id;
+    const lbl = s.label;
+
+    // Determine globalGroup (verse, chorus, bridge, etc.)
+    const gl = lbl.toLowerCase();
+    let globalGroup = 'verse';
+    if (/chorus|coro|refrain/.test(gl)) globalGroup = 'chorus';
+    else if (/bridge/.test(gl))          globalGroup = 'bridge';
+    else if (/pre.?chorus/.test(gl))     globalGroup = 'pre_chorus';
+    else if (/intro/.test(gl))           globalGroup = 'intro';
+    else if (/outro|ending/.test(gl))    globalGroup = 'outro';
+    else if (/tag|vamp/.test(gl))        globalGroup = 'tag';
+
+    // Layout depends on how many line types are active
+    const showTrans   = S.hasTrans    && s.tLines.length  > 0;
+    const showTranslit= S.hasTranslit && s.trLines.length > 0;
+
+    // Vertical split: primary gets more space on top
+    let pTop=3, pH=92, tTop=0, tH=0, trTop=0, trH=0;
+    if (showTrans && showTranslit) {
+      pTop=3;  pH=52; tTop=57; tH=24; trTop=82; trH=15;
+    } else if (showTrans) {
+      pTop=5;  pH=57; tTop=64; tH=31;
+    } else if (showTranslit) {
+      pTop=5;  pH=60; trTop=67; trH=28;
+    }
+
+    const pItem = makeFreeshowTextItem(
+      s.pLines,
+      `top:${pTop}%;left:5%;width:90%;height:${pH}%;`,
+      '{"size":72,"color":"#FFFFFF","align":"center","lineSpacing":1.2}'
+    );
+    const tItem = makeFreeshowTextItem(
+      s.tLines,
+      `top:${tTop}%;left:5%;width:90%;height:${tH}%;`,
+      '{"size":44,"color":"#FFD700","align":"center","lineSpacing":1.2}'
+    );
+    const trItem = makeFreeshowTextItem(
+      s.trLines,
+      `top:${trTop}%;left:5%;width:90%;height:${trH}%;`,
+      '{"size":34,"color":"#C0AAFF","align":"center","lineSpacing":1.2}'
+    );
+
+    const items = [pItem];
+    if (showTranslit) items.push(trItem);
+    if (showTrans)    items.push(tItem);
+
+    slidesObj[sId] = {
+      group:       lbl,
+      globalGroup: globalGroup,
+      color:       GROUP_COLORS[Object.keys(slidesObj).length % GROUP_COLORS.length] || null,
+      settings:    {},
+      notes:       '',
+      items:       items,
+    };
+
+    layoutSlides.push({ id: sId });
+  });
+
+  const layoutId = uid();
+  const show = {
+    name:     title,
+    category: 'song',
+    timestamps: { created: now, modified: now },
+    meta: {
+      title:  title,
+      artist: artist,
+      notes:  `Primary: ${pLang} | Translation: ${tLang}`,
+    },
+    slides: slidesObj,
+    layouts: {
+      [layoutId]: {
+        name:   'Default',
+        notes:  '',
+        slides: layoutSlides,
+      },
+    },
+    settings: {
+      activeLayout: layoutId,
+    },
+  };
+
+  download(safeName(title)+'.show', JSON.stringify(show, null, 2), 'application/json');
+  toast('FreeShow file downloaded!','success');
+}
+
+function makeFreeshowTextItem(lines, style, customStyle) {
+  // Each line → one "line" in FreeShow item format
+  const fsLines = lines.map(line => ({
+    align: '',
+    text: [{ value: line, style: '' }],
+  }));
+
+  // If no lines, add one empty line so the item renders
+  if (!fsLines.length) fsLines.push({ align:'', text:[{ value:'', style:'' }] });
+
+  return {
+    type:        'text',
+    style:       style,
+    customStyle: customStyle,
+    lines:       [fsLines],  // FreeShow wraps lines in an extra array (slide page)
+  };
+}
+
+// ─── Export: OpenLyrics XML ───────────────────────────────────
+function exportOpenLyrics() {
+  const title   = v('song-title') || 'Untitled Song';
+  const artist  = v('song-artist') || '';
+  const pCode   = document.getElementById('primary-lang').value;
+  const tCode   = document.getElementById('trans-lang').value;
+  const today   = new Date().toISOString().split('T')[0];
+
+  let verses = '';
+  S.slides.forEach(s => {
+    const vId = xesc(s.label);
+    if (s.pLines.length) {
+      verses += `    <verse name="${vId}" lang="${pCode}">\n      <lines>\n`;
+      s.pLines.forEach(l => { verses += `        <line>${xesc(l)}</line>\n`; });
+      verses += `      </lines>\n    </verse>\n`;
+    }
+    if (S.hasTrans && s.tLines.length) {
+      verses += `    <verse name="${vId}" lang="${tCode}">\n      <lines>\n`;
+      s.tLines.forEach(l => { verses += `        <line>${xesc(l)}</line>\n`; });
+      verses += `      </lines>\n    </verse>\n`;
+    }
+    if (S.hasTranslit && s.trLines.length) {
+      verses += `    <verse name="${vId}" lang="${pCode}" translit="true">\n      <lines>\n`;
+      s.trLines.forEach(l => { verses += `        <line>${xesc(l)}</line>\n`; });
+      verses += `      </lines>\n    </verse>\n`;
+    }
+  });
+
+  const xml =
+`<?xml version="1.0" encoding="UTF-8"?>
+<song xmlns="http://openlyrics.info/namespace/2009/song" version="0.9"
+      createdIn="VerseSync" modifiedDate="${today}">
+  <properties>
+    <titles><title>${xesc(title)}</title></titles>
+    <authors><author>${xesc(artist)}</author></authors>
+  </properties>
+  <lyrics>
+${verses}  </lyrics>
+</song>`;
+
+  download(safeName(title)+'.xml', xml, 'application/xml');
+  toast('OpenLyrics XML downloaded!','success');
+}
+
+// ─── Export: Plain Text ───────────────────────────────────────
+function exportText() {
+  const title  = v('song-title') || 'Untitled Song';
+  const artist = v('song-artist');
+  const pLang  = langName('primary-lang');
+  const tLang  = langName('trans-lang');
+
+  let lines = [title];
+  if (artist) lines.push(artist);
+  lines.push(`Languages: ${pLang} | ${tLang}`, '', '');
+
+  S.slides.forEach(s => {
+    lines.push(`=== ${s.label} ===`, '');
+    if (s.pLines.length)                          { lines.push(`[${pLang}]`,          ...s.pLines,  ''); }
+    if (S.hasTrans    && s.tLines.length)         { lines.push(`[${tLang}]`,          ...s.tLines,  ''); }
+    if (S.hasTranslit && s.trLines.length)        { lines.push(`[Transliteration]`,   ...s.trLines, ''); }
+    lines.push('');
+  });
+
+  download(safeName(title)+'.txt', lines.join('\n'), 'text/plain');
+  toast('Text file downloaded!','success');
+}
+
+// ─── Export: Print / PDF ─────────────────────────────────────
+function doPrint() {
+  buildPrintBody();
+  window.print();
+}
+
+function buildPrintBody() {
+  const title  = v('song-title') || 'Untitled Song';
+  const artist = v('song-artist');
+  const pLang  = langName('primary-lang');
+  const tLang  = langName('trans-lang');
+
+  let html = `<div style="font-family:sans-serif;max-width:700px;margin:0 auto;">`;
+  html += `<h1 style="font-size:22px;margin-bottom:2px;">${hesc(title)}</h1>`;
+  if (artist) html += `<p style="color:#555;font-size:13px;margin-bottom:4px;">${hesc(artist)}</p>`;
+  html += `<p style="color:#888;font-size:11px;margin-bottom:24px;">${hesc(pLang)} &nbsp;|&nbsp; ${hesc(tLang)}</p>`;
+
+  S.slides.forEach(s => {
+    html += `<div style="margin-bottom:20px;padding:14px;border:1px solid #ddd;border-radius:6px;page-break-inside:avoid;">`;
+    html += `<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#888;margin-bottom:8px;">${hesc(s.label)}</div>`;
+
+    // Determine column count for this slide
+    const showT  = S.hasTrans    && s.tLines.length>0;
+    const showTR = S.hasTranslit && s.trLines.length>0;
+    const colCount = 1 + (showT?1:0) + (showTR?1:0);
+    const colW = Math.floor(100/colCount)+'%';
+
+    html += `<table style="width:100%;border-collapse:collapse;"><tr>`;
+    html += `<td style="width:${colW};padding:4px 8px 4px 0;vertical-align:top;font-size:15px;line-height:1.5;">${hesc(s.pLines.join('\n')).replace(/\n/g,'<br>')}</td>`;
+    if (showT)  html += `<td style="width:${colW};padding:4px 0 4px 12px;vertical-align:top;font-size:13px;line-height:1.5;color:#555;border-left:2px solid #eee;">${hesc(s.tLines.join('\n')).replace(/\n/g,'<br>')}</td>`;
+    if (showTR) html += `<td style="width:${colW};padding:4px 0 4px 12px;vertical-align:top;font-size:12px;line-height:1.5;color:#7a6ca8;border-left:2px solid #eee;">${hesc(s.trLines.join('\n')).replace(/\n/g,'<br>')}</td>`;
+    html += `</tr></table></div>`;
+  });
+  html += `</div>`;
+  document.getElementById('print-body').innerHTML = html;
+}
+
+// ─── Helpers ─────────────────────────────────────────────────
+function v(id) { return document.getElementById(id).value.trim(); }
+function langName(id) {
+  const sel = document.getElementById(id);
+  return sel.options[sel.selectedIndex].text;
+}
+function uid()  { return Math.random().toString(36).slice(2,10); }
+function uuid4() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r=Math.random()*16|0;
+    return (c==='x'?r:(r&0x3|0x8)).toString(16).toUpperCase();
+  });
+}
+function hesc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function xesc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+}
+function safeName(s) {
+  return (s||'song').replace(/[^a-zA-Z0-9\-_ ]/g,'').trim().replace(/\s+/g,'_')||'song';
+}
+function download(filename, content, mime) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content],{type:mime}));
+  a.download = filename;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),60000);
+}
+function hexToRVBA(hex) {
+  // Convert #rrggbb → "r g b 1" with values 0-1 for ProPresenter
+  const r=parseInt(hex.slice(1,3),16)/255;
+  const g=parseInt(hex.slice(3,5),16)/255;
+  const b=parseInt(hex.slice(5,7),16)/255;
+  return `${r.toFixed(4)} ${g.toFixed(4)} ${b.toFixed(4)} 1`;
+}
+function toast(msg, type='success') {
+  const el = document.getElementById('toast');
+  const icons = {success:'✓',error:'✕',warning:'⚠'};
+  el.innerHTML = `<span>${icons[type]||'✓'}</span> ${hesc(msg)}`;
+  el.className = `toast show ${type}`;
+  clearTimeout(el._t);
+  el._t = setTimeout(()=>el.classList.remove('show'),3000);
+}
+</script>
+</body>
+</html>
