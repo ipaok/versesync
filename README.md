@@ -151,18 +151,10 @@ If you run into issues, try refreshing the page or reopening the HTML file.
 - **ProPresenter Export**: Custom binary format generation (inspired by VerseFlow).
 - **File Generation**: Browser-native Blob and download APIs.
 
-## Related Projects
-
-- [VerseFlow](https://github.com/your-org/verseflow) — Python tool for batch-converting ProPresenter libraries. VerseSync borrows its PP7 binary logic.
-- [VerseBridge](https://versebridge.app/studio) — The original inspiration for VerseSync's workflow and features.
 
 ## Contributing
 
 Found a bug or have a feature request? Open an issue on GitHub. Pull requests welcome!
-
-## License
-
-[Add license info here, e.g., MIT License]
 
 ---
 
